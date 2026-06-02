@@ -1,0 +1,148 @@
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+// Configuración del Ave
+const bird = {
+    x: 50,
+    y: 150,
+    radius: 12,
+    gravity: 0.3,
+    velocity: 0,
+    jump: -5.5,
+    draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffeb3b"; // Amarillo Flappy
+        ctx.fill();
+        ctx.closePath();
+        
+        // Ojo del ave
+        ctx.beginPath();
+        ctx.arc(this.x + 6, this.y - 4, 3, 0, Math.PI * 2);
+        ctx.fillStyle = "#000";
+        ctx.fill();
+        ctx.closePath();
+    },
+    update() {
+        this.velocity += this.gravity;
+        this.y += this.velocity;
+        
+        // Evitar que caiga al infinito
+        if (this.y + this.radius > canvas.height) {
+            this.y = canvas.height - this.radius;
+            resetGame();
+        }
+        // Evitar que salga por arriba
+        if (this.y - this.radius < 0) {
+            this.y = this.radius;
+            this.velocity = 0;
+        }
+    }
+};
+
+// Configuración de las Tuberías
+const pipes = [];
+const pipeWidth = 50;
+const pipeGap = 110;
+let frameCount = 0;
+let score = 0;
+
+function spawnPipe() {
+    const minHeight = 40;
+    const maxHeight = canvas.height - pipeGap - minHeight;
+    const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+    
+    pipes.push({
+        x: canvas.width,
+        top: topHeight,
+        bottom: canvas.height - topHeight - pipeGap,
+        passed: false
+    });
+}
+
+// Control de saltos (Soporta Click y Touch para Teléfono)
+function flap() {
+    bird.velocity = bird.jump;
+}
+
+window.addEventListener("keydown", (e) => {
+    if (e.code === "Space") flap();
+});
+canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault(); // Evita el doble tap zoom en el teléfono
+    flap();
+});
+canvas.addEventListener("mousedown", flap);
+
+// Reiniciar Juego
+function resetGame() {
+    bird.y = 150;
+    bird.velocity = 0;
+    pipes.length = 0;
+    score = 0;
+    frameCount = 0;
+}
+
+// Bucle principal del juego
+function loop() {
+    // 1. Limpiar pantalla
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Dibuja fondo (Cielo azul simulado por el CSS, añadimos un suelo)
+    ctx.fillStyle = "#d7da3d";
+    ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+    
+    // 2. Actualizar y dibujar ave
+    bird.update();
+    bird.draw();
+    
+    // 3. Manejo de tuberías
+    if (frameCount % 90 === 0) {
+        spawnPipe();
+    }
+    
+    for (let i = pipes.length - 1; i >= 0; i--) {
+        pipes[i].x -= 2; // Velocidad de avance
+        
+        // Dibujar tubería superior
+        ctx.fillStyle = "#4caf50"; // Verde tubería
+        ctx.fillRect(pipes[i].x, 0, pipeWidth, pipes[i].top);
+        
+        // Dibujar tubería inferior
+        ctx.fillRect(pipes[i].x, canvas.height - pipes[i].bottom, pipeWidth, pipes[i].bottom);
+        
+        // Detectar colisiones
+        if (
+            bird.x + bird.radius > pipes[i].x &&
+            bird.x - bird.radius < pipes[i].x + pipeWidth &&
+            (bird.y - bird.radius < pipes[i].top || bird.y + bird.radius > canvas.height - pipes[i].bottom)
+        ) {
+            resetGame();
+        }
+        
+        // Sumar puntos
+        if (!pipes[i].passed && pipes[i].x + pipeWidth < bird.x) {
+            score++;
+            pipes[i].passed = true;
+        }
+        
+        // Eliminar tuberías que salen de la pantalla
+        if (pipes[i].x + pipeWidth < 0) {
+            pipes.splice(i, 1);
+        }
+    }
+    
+    // 4. Dibujar Puntuación
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 24px Arial";
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#000";
+    ctx.strokeText(score, canvas.width / 2 - 10, 40);
+    ctx.fillText(score, canvas.width / 2 - 10, 40);
+    
+    frameCount++;
+    requestAnimationFrame(loop);
+}
+
+// Iniciar el juego
+loop();
